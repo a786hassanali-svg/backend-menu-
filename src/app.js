@@ -19,6 +19,9 @@ import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
+// Trust proxy for hosted environments (Render, Heroku, reverse proxies)
+app.set('trust proxy', 1);
+
 // Security HTTP headers
 app.use(
   helmet({

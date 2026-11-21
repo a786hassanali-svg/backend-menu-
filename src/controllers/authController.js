@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
 import { Restaurant } from '../models/Restaurant.js';
 
-const generateToken = (id) => {
+export const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret', {
     expiresIn: '30d',
   });
