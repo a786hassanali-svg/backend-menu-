@@ -48,8 +48,8 @@ export const register = async (req, res, next) => {
       slug,
       email,
       phone: phone || '',
-      currency: 'USD',
-      currencySymbol: '$',
+      currency: 'PKR',
+      currencySymbol: 'PKR ',
       taxPercentage: 5,
       allowedRadiusMeters: 300,
     });
