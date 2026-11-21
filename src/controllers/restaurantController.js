@@ -271,3 +271,90 @@ export const toggleRestaurantStatus = async (req, res, next) => {
   }
 };
 
+// @desc Impersonate (Login As) Restaurant Admin (Super Admin)
+// @route POST /api/restaurants/:id/impersonate
+export const impersonateRestaurant = async (req, res, next) => {
+  try {
+    const { User } = await import('../models/User.js');
+    const { generateToken } = await import('./authController.js');
+
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    // Find the admin user of this restaurant
+    let adminUser = await User.findOne({ restaurantId: restaurant._id, role: 'restaurant_admin' });
+    
+    // If not found, check createdBy
+    if (!adminUser && restaurant.createdBy) {
+      adminUser = await User.findById(restaurant.createdBy);
+    }
+
+    if (!adminUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'No admin user found for this restaurant to impersonate.',
+      });
+    }
+
+    const token = generateToken(adminUser._id);
+
+    res.status(200).json({
+      success: true,
+      message: `Switched into ${restaurant.name} admin dashboard`,
+      token,
+      user: {
+        id: adminUser._id,
+        name: adminUser.name,
+        email: adminUser.email,
+        role: adminUser.role,
+        restaurantId: restaurant._id,
+        restaurant,
+        isImpersonating: true,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc Reset Restaurant Admin Password (Super Admin)
+// @route POST /api/restaurants/:id/reset-password
+export const resetRestaurantPassword = async (req, res, next) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long.',
+      });
+    }
+
+    const { User } = await import('../models/User.js');
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    let adminUser = await User.findOne({ restaurantId: restaurant._id, role: 'restaurant_admin' });
+    if (!adminUser && restaurant.createdBy) {
+      adminUser = await User.findById(restaurant.createdBy);
+    }
+
+    if (!adminUser) {
+      return res.status(404).json({ success: false, message: 'Admin user not found for this restaurant' });
+    }
+
+    adminUser.password = newPassword;
+    await adminUser.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Password successfully updated for ${adminUser.email}`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
