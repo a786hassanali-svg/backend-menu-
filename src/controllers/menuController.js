@@ -56,6 +56,16 @@ export const getMenuByTableToken = async (req, res, next) => {
       });
     }
 
+    // Check subscription status
+    const now = new Date();
+    if (restaurant.subscription?.expiresAt && now > new Date(restaurant.subscription.expiresAt)) {
+      return res.status(403).json({
+        success: false,
+        code: 'SUBSCRIPTION_EXPIRED',
+        message: 'This restaurant software plan has expired. Please contact management.',
+      });
+    }
+
     // 4. Fetch Active Categories
     const categories = await Category.find({
       restaurantId: restaurant._id,

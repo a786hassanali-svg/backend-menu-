@@ -105,6 +105,33 @@ const restaurantSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    subscription: {
+      status: {
+        type: String,
+        enum: ['active', 'expired', 'trial', 'grace_period'],
+        default: 'active',
+      },
+      plan: {
+        type: String,
+        default: '1 Month Standard Plan',
+      },
+      startDate: {
+        type: Date,
+        default: Date.now,
+      },
+      expiresAt: {
+        type: Date,
+        default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days from creation
+      },
+      price: {
+        type: Number,
+        default: 0,
+      },
+      notes: {
+        type: String,
+        default: '',
+      },
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

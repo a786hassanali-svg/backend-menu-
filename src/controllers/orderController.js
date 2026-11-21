@@ -70,6 +70,16 @@ export const createOrder = async (req, res, next) => {
       });
     }
 
+    // Check subscription status
+    const now = new Date();
+    if (restaurant.subscription?.expiresAt && now > new Date(restaurant.subscription.expiresAt)) {
+      return res.status(403).json({
+        success: false,
+        code: 'SUBSCRIPTION_EXPIRED',
+        message: 'Ordering is temporarily paused as the restaurant subscription has expired.',
+      });
+    }
+
     if (!restaurant.isOnlineOrderingEnabled) {
       return res.status(403).json({
         success: false,

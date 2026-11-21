@@ -105,8 +105,147 @@ export const getRestaurantBySlug = async (req, res, next) => {
 // @route GET /api/restaurants
 export const getAllRestaurants = async (req, res, next) => {
   try {
-    const restaurants = await Restaurant.find().sort({ createdAt: -1 });
+    const restaurants = await Restaurant.find()
+      .populate('createdBy', 'name email phone')
+      .sort({ createdAt: -1 });
+
     res.status(200).json({ success: true, count: restaurants.length, restaurants });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc Create new restaurant with 1-month plan & assign Admin (Super Admin)
+// @route POST /api/restaurants/create-new
+export const createRestaurantBySuperAdmin = async (req, res, next) => {
+  try {
+    const {
+      name,
+      slug,
+      phone,
+      address,
+      adminName,
+      adminEmail,
+      adminPassword,
+      durationDays = 30,
+      subscriptionPrice = 0,
+    } = req.body;
+
+    if (!name || !adminEmail || !adminPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Restaurant Name, Admin Email, and Admin Password are required.',
+      });
+    }
+
+    const { User } = await import('../models/User.js');
+
+    // Check if email already exists
+    const existingUser = await User.findOne({ email: adminEmail.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'A user with this admin email already exists.',
+      });
+    }
+
+    // Auto generate slug if not provided
+    const baseSlug = (slug || name)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    while (await Restaurant.findOne({ slug: uniqueSlug })) {
+      uniqueSlug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    const days = Number(durationDays) || 30;
+    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+    const restaurant = await Restaurant.create({
+      name,
+      slug: uniqueSlug,
+      phone: phone || '',
+      address: address || '',
+      subscription: {
+        status: 'active',
+        plan: `${days} Days Plan`,
+        startDate: new Date(),
+        expiresAt,
+        price: Number(subscriptionPrice) || 0,
+      },
+    });
+
+    const user = await User.create({
+      name: adminName || `${name} Admin`,
+      email: adminEmail.toLowerCase(),
+      password: adminPassword,
+      phone: phone || '',
+      role: 'restaurant_admin',
+      restaurantId: restaurant._id,
+      permissions: ['all'],
+    });
+
+    restaurant.createdBy = user._id;
+    await restaurant.save();
+
+    res.status(201).json({
+      success: true,
+      message: `Restaurant created successfully with ${days} days active plan!`,
+      restaurant,
+      adminUser: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc Renew / Extend Restaurant Subscription by Days (Super Admin)
+// @route POST /api/restaurants/:id/renew
+export const renewRestaurantSubscription = async (req, res, next) => {
+  try {
+    const { days = 30 } = req.body;
+    const restaurant = await Restaurant.findById(req.params.id);
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    const numDays = Number(days) || 30;
+    const now = new Date();
+    
+    // If currently already active and not expired yet, extend from current expiry date.
+    // If already expired, extend from today.
+    let baseDate = now;
+    if (restaurant.subscription?.expiresAt && new Date(restaurant.subscription.expiresAt) > now) {
+      baseDate = new Date(restaurant.subscription.expiresAt);
+    }
+
+    const newExpiry = new Date(baseDate.getTime() + numDays * 24 * 60 * 60 * 1000);
+
+    if (!restaurant.subscription) {
+      restaurant.subscription = {};
+    }
+
+    restaurant.subscription.status = 'active';
+    restaurant.subscription.expiresAt = newExpiry;
+    restaurant.isActive = true; // Auto re-activate if it was inactive
+
+    await restaurant.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Subscription successfully renewed for ${numDays} days! New Expiry: ${newExpiry.toLocaleDateString()}`,
+      restaurant,
+    });
   } catch (error) {
     next(error);
   }
