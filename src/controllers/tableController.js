@@ -4,9 +4,21 @@ import { Order } from '../models/Order.js';
 import { generateQRCodeDataUrl, generateQRCodeSVG, generateQRCodeBuffer } from '../utils/qr.js';
 import { emitTableStatusUpdate } from '../sockets/socketManager.js';
 
-const getQRMenuUrl = (qrToken) => {
-  const baseUrl = process.env.QR_BASE_URL || 'http://localhost:5173/menu';
-  return `${baseUrl}/${qrToken}`;
+const getQRMenuUrl = (qrToken, req = null) => {
+  if (process.env.QR_BASE_URL) {
+    return `${process.env.QR_BASE_URL.replace(/\/$/, '')}/${qrToken}`;
+  }
+  const origin = req?.headers?.origin || req?.headers?.referer;
+  if (origin) {
+    try {
+      const u = new URL(origin);
+      return `${u.origin}/menu/${qrToken}`;
+    } catch {}
+  }
+  if (process.env.CLIENT_URL) {
+    return `${process.env.CLIENT_URL.replace(/\/$/, '')}/menu/${qrToken}`;
+  }
+  return `http://localhost:5173/menu/${qrToken}`;
 };
 
 // @desc Get all tables for restaurant
@@ -62,7 +74,7 @@ export const createTable = async (req, res, next) => {
     }
 
     const qrToken = crypto.randomBytes(16).toString('hex');
-    const menuUrl = getQRMenuUrl(qrToken);
+    const menuUrl = getQRMenuUrl(qrToken, req);
     const qrCodeDataUrl = await generateQRCodeDataUrl(menuUrl);
 
     const table = await Table.create({
@@ -185,7 +197,7 @@ export const regenerateQR = async (req, res, next) => {
     }
 
     const newQrToken = crypto.randomBytes(16).toString('hex');
-    const menuUrl = getQRMenuUrl(newQrToken);
+    const menuUrl = getQRMenuUrl(newQrToken, req);
     const newQrCodeDataUrl = await generateQRCodeDataUrl(menuUrl);
 
     table.qrToken = newQrToken;
@@ -218,7 +230,7 @@ export const downloadQR = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Table not found' });
     }
 
-    const menuUrl = getQRMenuUrl(table.qrToken);
+    const menuUrl = getQRMenuUrl(table.qrToken, req);
 
     if (format === 'svg') {
       const svg = await generateQRCodeSVG(menuUrl);
