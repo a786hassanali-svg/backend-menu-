@@ -447,3 +447,38 @@ export const trackOrderCustomer = async (req, res, next) => {
   }
 };
 
+// @desc Delete an order (Admin / Manager only)
+// @route DELETE /api/orders/:id
+export const deleteOrder = async (req, res, next) => {
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      restaurantId: req.user.restaurantId,
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // If order was holding a table, free it up
+    if (order.tableId) {
+      const table = await Table.findById(order.tableId);
+      if (table && table.currentOrderId && table.currentOrderId.toString() === order._id.toString()) {
+        table.currentOrderId = null;
+        table.occupancyStatus = 'available';
+        await table.save();
+        emitTableStatusUpdate(req.user.restaurantId, table);
+      }
+    }
+
+    await Order.findByIdAndDelete(order._id);
+
+    res.status(200).json({
+      success: true,
+      message: `Order #${order.orderNumber} deleted successfully`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -5,6 +5,7 @@ import {
   getOrderById,
   updateOrderStatus,
   trackOrderCustomer,
+  deleteOrder,
 } from '../controllers/orderController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -22,6 +23,12 @@ router.patch(
   protect,
   authorize('restaurant_admin', 'manager', 'cashier', 'kitchen_staff', 'waiter'),
   updateOrderStatus
+);
+router.delete(
+  '/:id',
+  protect,
+  authorize('restaurant_admin', 'manager'),
+  deleteOrder
 );
 
 export default router;
