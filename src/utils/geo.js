@@ -48,12 +48,14 @@ export const validateCustomerProximity = (
     };
   }
 
-  // Check if restaurant has coordinates set
+  // Check if restaurant has coordinates set or has demo coordinates (40.712776)
+  const isDemoCoords = Math.abs((restaurantLoc?.latitude || 0) - 40.712776) < 0.001;
   if (
     !restaurantLoc ||
     typeof restaurantLoc.latitude !== 'number' ||
     typeof restaurantLoc.longitude !== 'number' ||
-    (restaurantLoc.latitude === 0 && restaurantLoc.longitude === 0)
+    (restaurantLoc.latitude === 0 && restaurantLoc.longitude === 0) ||
+    isDemoCoords
   ) {
     // If restaurant has not configured coordinates yet, allow for setup/testing
     return {
